@@ -1,14 +1,17 @@
 package com.github.zlamb1.view;
 
-import com.github.zlamb1.Customer;
-import com.github.zlamb1.ISeatDescriptor;
-import com.github.zlamb1.LoginService;
+import com.github.zlamb1.*;
 import com.github.zlamb1.io.ImageLoader;
+import com.github.zlamb1.layout.ILayoutService;
+import com.github.zlamb1.layout.SeatLayoutDescriptor;
+import com.github.zlamb1.svg.SVGButton;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -21,6 +24,8 @@ public class AppView implements IAppView {
 
     protected Field nameField;
     protected PasswordField passwordField, passwordFieldTwo;
+
+    protected SeatFilter seatFilter;
 
     protected int logoWidth = 225, logoHeight = 150;
 
@@ -55,74 +60,109 @@ public class AppView implements IAppView {
     }
 
     @Override
-    public MenuOption renderAppView(LoginService loginService) {
+    public MenuOption renderAppView(LoginService loginService, SeatService seatService) {
         SwingUtilities.invokeLater(() -> {
             contentPane = new JPanel();
             contentPane.setLayout(new GridBagLayout());
+            gbc = new GridBagConstraints();
 
-            GridBagConstraints gbc = new GridBagConstraints();
+            createTopBar(loginService);
+            createSideBar();
 
-            int logoutButtonSize = 35;
-            int logoutIconSize = logoutButtonSize - 10;
-
-            Image logoutImage = ImageLoader.loadImage("logout.png", logoutIconSize, logoutIconSize);
-            assert logoutImage != null;
-
-            JPanel topBar = new JPanel();
-            topBar.setLayout(new BoxLayout(topBar, BoxLayout.X_AXIS));
-
-            Customer customer = loginService.getLoggedIn();
-            if (customer != null) {
-                JLabel customerLabel = new JLabel("Hello, " + customer.getName() + "!");
-                topBar.add(customerLabel);
-            }
-
-            topBar.add(Box.createHorizontalGlue());
-
-            JButton logoutButton = new JButton(new ImageIcon(logoutImage)) {
-                @Override
-                public JToolTip createToolTip() {
-                    JToolTip toolTip = new JToolTip();
-                    toolTip.setBorder(new EmptyBorder(5, 5, 5, 5));
-                    return toolTip;
-                }
-            };
-
-            logoutButton.setPreferredSize(new Dimension(logoutButtonSize, logoutButtonSize));
-            logoutButton.setToolTipText("Logout");
-            logoutButton.addActionListener(e -> {
-                for (LogoutHandler logoutHandler : logoutHandlers) {
-                    logoutHandler.onLogout();
-                }
-            });
-
-            topBar.add(logoutButton);
-
-            gbc.gridx = 0;
-            gbc.gridy = 0;
-            gbc.fill = GridBagConstraints.HORIZONTAL;
-            gbc.weightx = 1.0;
-            gbc.anchor = GridBagConstraints.NORTHWEST;
-
-            contentPane.add(topBar, gbc);
+            JButton submitBtn = new JButton("Book Seats");
+            submitBtn.setVisible(false);
 
             JPanel gridPanel = new JPanel();
 
-            gridPanel.setLayout(new GridLayout(6, 24, 2, 2));
+            gridPanel.setLayout(new GridBagLayout());
+            GridBagConstraints gridGBC = new GridBagConstraints();
 
-            for (int r = 0; r < 6; r++) {
-                for (int c = 0; c < 24; c++) {
-                    SeatButton btn = new SeatButton();
-                    gridPanel.add(btn);
+            List<SeatButton> seatButtons = new ArrayList<>();
+            List<ISeatDescriptor> seatDescriptors = new ArrayList<>();
+
+            SeatTicket seatTicket = new SeatTicket();
+
+            seatFilter.addFilterListener(filter -> {
+                seatButtons.forEach(seatButton -> seatButton.setGhosted(
+                    (filter.filterByWindowSeats() && !seatButton.getSeatDescriptor().isWindowSeat()) ||
+                    (filter.filterByAisleSeats() && !seatButton.getSeatDescriptor().isAisleSeat())
+                ));
+                gridPanel.repaint();
+            });
+
+            ILayoutService layoutService = seatService.getLayoutService();
+            for (SeatLayoutDescriptor seatLayoutDescriptor : layoutService) {
+                int row = seatLayoutDescriptor.getRow();
+                int col = seatLayoutDescriptor.getColumn();
+
+                gridGBC.gridx = col;
+                gridGBC.gridy = row;
+                gridGBC.insets = layoutService.getGaps(row, col);
+
+                if (seatLayoutDescriptor.hasDescriptor()) {
+                    ISeatDescriptor seatDescriptor = seatLayoutDescriptor.getSeatDescriptor();
+                    SeatButton btn = new SeatButton(seatLayoutDescriptor.getSeatDescriptor());
+                    seatButtons.add(btn);
+
+                    btn.addMouseListener(new MouseAdapter() {
+                        @Override
+                        public void mouseExited(MouseEvent e) {
+                            if (seatDescriptor.equals(seatTicket.getSeatDescriptor()))
+                                seatTicket.setSeatDescriptor(seatDescriptors.isEmpty() ? null : seatDescriptors.getLast());
+                        }
+                        @Override
+                        public void mouseClicked(MouseEvent e) {
+                            boolean empty = seatDescriptors.isEmpty();
+                            if (btn.isSelected())
+                                seatDescriptors.remove(seatDescriptor);
+                            else seatDescriptors.add(seatDescriptor);
+                            btn.setSelected(!btn.isSelected());
+                            if (seatDescriptors.isEmpty() != empty) {
+                                submitBtn.setVisible(!seatDescriptors.isEmpty());
+                                contentPane.revalidate();
+                                contentPane.repaint();
+                            }
+                        }
+                    });
+
+                    btn.addMouseMotionListener(new MouseAdapter() {
+                        private void setTicket() {
+                            seatTicket.setSeatDescriptor(seatDescriptor);
+                        }
+                        @Override
+                        public void mouseMoved(MouseEvent e) {
+                            setTicket();
+                        }
+                        @Override
+                        public void mouseDragged(MouseEvent e) {
+                            setTicket();
+                        }
+                    });
+
+                    gridPanel.add(btn, gridGBC);
+                } else {
+                    JPanel filler = new JPanel();
+                    filler.setOpaque(false);
+                    // FIXME: do not use magic constants for size
+                    filler.setPreferredSize(new Dimension(25, 25));
+                    gridPanel.add(filler, gridGBC);
                 }
             }
 
-            gbc.gridy++;
-            gbc.weighty = 1.0;
+            gbc.gridx = 0;
+            gbc.gridy = 1;
+            gbc.weightx = 1.0;
+            gbc.weighty = 0.0;
             gbc.fill = GridBagConstraints.NONE;
             gbc.anchor = GridBagConstraints.NORTH;
 
             contentPane.add(gridPanel, gbc);
+
+            gbc.gridy++;
+            gbc.insets = new Insets(25, 0, 0, 0);
+            gbc.ipadx = 150;
+
+            contentPane.add(seatTicket, gbc);
 
             contentPane.setBorder(new EmptyBorder(5, 5, 5, 5));
 
@@ -195,6 +235,85 @@ public class AppView implements IAppView {
             frame.setContentPane(contentPane);
             frame.revalidate();
         });
+    }
+
+    protected void createTopBar(LoginService loginService) {
+        JPanel topBar = new JPanel();
+        topBar.setLayout(new BoxLayout(topBar, BoxLayout.X_AXIS));
+
+        Customer customer = loginService.getLoggedIn();
+        if (customer != null) {
+            JLabel customerLabel = new JLabel("Hello, " + customer.getName() + "!");
+            topBar.add(customerLabel);
+        }
+
+        topBar.add(Box.createHorizontalGlue());
+
+        SVGButton logoutBtn = new SVGButton("logout.svg", null) {
+            @Override
+            public JToolTip createToolTip() {
+                JToolTip toolTip = new JToolTip();
+                toolTip.setBorder(new EmptyBorder(5, 5, 5, 5));
+                return toolTip;
+            }
+        };
+
+        logoutBtn.setSVGColor(logoutBtn.getForeground());
+
+        logoutBtn.setPreferredSize(new Dimension(25, 25));
+        logoutBtn.setMaximumSize(new Dimension(25, 25));
+
+        logoutBtn.setToolTipText("Logout");
+        logoutBtn.addActionListener(e -> {
+            for (LogoutHandler logoutHandler : logoutHandlers) {
+                logoutHandler.onLogout();
+            }
+        });
+
+        topBar.add(logoutBtn);
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1.0;
+        gbc.anchor = GridBagConstraints.NORTHWEST;
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.insets = InsetHelper.createSouthInsets(5);
+
+        contentPane.add(topBar, gbc);
+
+        gbc.gridwidth = 1;
+        gbc.insets = InsetHelper.createEmptyInsets();
+    }
+
+    protected void createSideBar() {
+        JPanel sideBar = new JPanel();
+        sideBar.setBorder(BorderFactory.createLineBorder(sideBar.getForeground()));
+
+        sideBar.setLayout(new GridBagLayout());
+
+        GridBagConstraints sideBarGBC = new GridBagConstraints();
+
+        sideBarGBC.weighty = 1.0;
+        sideBarGBC.fill = GridBagConstraints.BOTH;
+        sideBarGBC.anchor = GridBagConstraints.NORTH;
+
+        seatFilter = new SeatFilter();
+        sideBar.add(seatFilter, sideBarGBC);
+
+        gbc.gridx = 1;
+        gbc.gridy = 1;
+        gbc.weightx = 0.0;
+        gbc.weighty = 1.0;
+        gbc.fill = GridBagConstraints.VERTICAL;
+        gbc.gridheight = GridBagConstraints.REMAINDER;
+        gbc.insets = InsetHelper.createHorizontalInsets(5);
+        gbc.anchor = GridBagConstraints.EAST;
+
+        contentPane.add(sideBar, gbc);
+
+        gbc.insets = InsetHelper.createEmptyInsets();
+        gbc.gridheight = 1;
     }
 
     protected void createLoginRegisterMenu() {
@@ -294,7 +413,12 @@ public class AppView implements IAppView {
     }
 
     @Override
-    public Collection<ISeatDescriptor> renderSeatView(LoginService loginService, Collection<ISeatDescriptor> seats) {
+    public Collection<ISeatDescriptor> renderSeatView(LoginService loginService, SeatService seatService) {
         return List.of();
+    }
+
+    @Override
+    public void renderLayoutView() {
+
     }
 }

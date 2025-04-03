@@ -1,13 +1,18 @@
 package com.github.zlamb1;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import com.github.zlamb1.layout.ILayoutService;
+import com.github.zlamb1.layout.LayoutService;
+import com.github.zlamb1.layout.SeatLayout;
+import com.github.zlamb1.layout.SeatLayoutDescriptor;
+
+import java.util.*;
 
 public class SeatService {
-    protected Map<String, Seat> seats;
+    protected SeatLayout seatLayout;
+    protected ILayoutService layoutService;
     protected LoginService loginService;
+
+    protected Map<String, List<ISeatDescriptor>> customerSeats = new HashMap<>();
 
     public enum BookResult {
         SUCCESS,
@@ -18,48 +23,71 @@ public class SeatService {
         INSUFFICIENT_PRIVILEGE
     }
 
-    public SeatService(Collection<Seat> seats, LoginService loginService) {
-        this.seats = new HashMap<>();
+    public SeatService(SeatLayout seatLayout, LoginService loginService) {
+        this.seatLayout = seatLayout;
+        this.layoutService = new LayoutService(seatLayout);
         this.loginService = loginService;
 
-        for (Seat seat : seats) {
-            this.seats.put(seat.getName(), seat);
+        // generate mapping from customers to seats
+        for (SeatLayoutDescriptor seatLayoutDescriptor : layoutService) {
+            ISeatDescriptor seatDescriptor;
+            if (seatLayoutDescriptor.hasDescriptor() && (seatDescriptor = seatLayoutDescriptor.getSeatDescriptor()).isReserved()) {
+                Customer customer = seatDescriptor.getReserver();
+                List<ISeatDescriptor> seatDescriptors = customerSeats.computeIfAbsent(customer.getName(), k -> new ArrayList<>());
+                seatDescriptors.add(seatDescriptor);
+            }
         }
     }
 
-    public Collection<ISeatDescriptor> getSeats() {
-        return Collections.unmodifiableCollection(seats.values());
-    }
-
-    public BookResult bookSeat(Customer customer, ISeatDescriptor seat) {
+    public BookResult bookSeat(Customer customer, ISeatDescriptor seatDescriptor) {
         if (customer == null)
             return BookResult.INVALID_CUSTOMER;
-        if (!seats.containsKey(seat.getName()))
+        if (!inBounds(seatDescriptor))
             return BookResult.INVALID_SEAT;
-        Seat s = seats.get(seat.getName());
-        if (s.isReserved())
+        Seat seat = seatLayout.getSeat(seatDescriptor.getRow(), seatDescriptor.getColumn());
+        if (seat == null)
+            return BookResult.INVALID_SEAT;
+        if (seat.isReserved())
             return BookResult.SEAT_UNAVAILABLE;
-        s.reserve(customer);
+        seat.reserve(customer);
         return BookResult.SUCCESS;
     }
 
-    public BookResult bookSeat(ISeatDescriptor seat) {
-        return bookSeat(loginService.getLoggedIn(), seat);
+    public BookResult bookSeat(ISeatDescriptor seatDescriptor) {
+        return bookSeat(loginService.getLoggedIn(), seatDescriptor);
     }
 
-    public BookResult cancelSeat(ISeatDescriptor seat) {
-        if (!seats.containsKey(seat.getName()))
+    public BookResult cancelSeat(ISeatDescriptor seatDescriptor) {
+        if (!inBounds(seatDescriptor))
             return BookResult.INVALID_SEAT;
-        Seat s = seats.get(seat.getName());
-        if (!s.isReserved())
+        Seat seat = seatLayout.getSeat(seatDescriptor.getRow(), seatDescriptor.getColumn());
+        if (seat == null)
+            return BookResult.INVALID_SEAT;
+        if (!seat.isReserved())
             return BookResult.SEAT_AVAILABLE;
-        if (s.getReserver() != loginService.getLoggedIn() && !isPrivilegedUser())
+        if (seat.getReserver() != loginService.getLoggedIn() && !isPrivilegedUser())
             return BookResult.INSUFFICIENT_PRIVILEGE;
-        s.reserve(null);
+        seat.reserve(null);
         return BookResult.SUCCESS;
+    }
+
+    public Collection<ISeatDescriptor> getCustomerSeats(Customer customer) {
+        return customerSeats.get(customer.getName());
+    }
+
+    public ILayoutService getLayoutService() {
+        return layoutService;
     }
 
     protected boolean isPrivilegedUser() {
         return loginService.isLoggedIn() && loginService.getLoggedIn().getPrivilege() > 0;
+    }
+
+    protected boolean inBounds(ISeatDescriptor seat) {
+        return inBounds(seat.getRow(), seat.getColumn());
+    }
+
+    protected boolean inBounds(int row, int col) {
+        return row >= 0 && row < seatLayout.getRows() && col >= 0 && col < seatLayout.getCols();
     }
 }

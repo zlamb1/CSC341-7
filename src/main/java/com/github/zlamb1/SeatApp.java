@@ -1,17 +1,26 @@
 package com.github.zlamb1;
 
 import com.github.zlamb1.io.IAppSerializer;
+import com.github.zlamb1.layout.LayoutService;
 import com.github.zlamb1.view.IAppView;
+import com.github.zlamb1.layout.LayoutFactory;
+import com.github.zlamb1.layout.SeatLayout;
 
 public class SeatApp {
     protected IAppView appView;
     protected IAppSerializer appSerializer;
     protected LoginService loginService;
 
+    protected SeatService seatService;
+
     public SeatApp(IAppView appView, IAppSerializer appSerializer) {
         this.appView = appView;
         this.appSerializer = appSerializer;
         this.loginService = new LoginService(appSerializer);
+
+        SeatLayout seatLayout = LayoutFactory.createStandardLayout();
+        this.seatService = new SeatService(seatLayout, loginService);
+
         appView.addLoginHandler(this::onLogin);
         appView.addRegisterHandler(this::onRegister);
         appView.addLogoutHandler(this::onLogout);
@@ -19,7 +28,6 @@ public class SeatApp {
 
     public void startApp() {
         appView.renderLoginView();
-        //appView.renderAppView(loginService);
     }
 
     public void onLogin(String name, String password) {
@@ -31,7 +39,7 @@ public class SeatApp {
             LoginService.LoginResult loginResult;
             loginResult = loginService.login(name, password);
             switch (loginResult) {
-                case SUCCESS -> appView.renderAppView(loginService);
+                case SUCCESS -> appView.renderAppView(loginService, seatService);
                 case WRONG_NAME -> nameHint = "Unknown name.";
                 case WRONG_PASSWORD -> passwordHint = "Incorrect password.";
                 default -> passwordHint = "Unknown error occurred.";

@@ -7,7 +7,7 @@ import java.util.Collection;
 
 public interface IAppSerializer {
     void serializeCustomers(Collection<Customer> customer);
-    void serializeSeats(Collection<Seat> seat);
+    void serializeSeats(Collection<Seat> seats);
 
     Collection<Customer> deserializeCustomers();
     Collection<Seat> deserializeSeats();

@@ -20,5 +20,10 @@
             <artifactId>json</artifactId>
             <version>20250107</version>
         </dependency>
+        <dependency>
+            <groupId>com.github.weisj</groupId>
+            <artifactId>jsvg</artifactId>
+            <version>1.7.0</version>
+        </dependency>
     </dependencies>
 </project>

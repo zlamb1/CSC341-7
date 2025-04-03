@@ -59,12 +59,13 @@ public class PasswordField extends Field {
     @Override
     protected void paintComponent(final Graphics g) {
         int buttonSize = jTextField.getHeight();
-        if ((cachedButtonSize != buttonSize || cachedVisibility != isPasswordHidden()) && buttonSize - 15 > 0) {
+        int iconSize = buttonSize - 15;
+        if ((cachedButtonSize != buttonSize || cachedVisibility != isPasswordHidden()) && iconSize > 0) {
             cachedButtonSize = buttonSize;
             cachedVisibility = isPasswordHidden();
 
             ImageStore store = isPasswordHidden() ? visibilityOffStore : visibilityOnStore;
-            Image buttonImage = store.getImage(buttonSize - 15, buttonSize - 15);
+            Image buttonImage = store.getImage(iconSize, iconSize);
             if (buttonImage != null) {
                 visibilityButton.setVisible(true);
                 visibilityButton.setIcon(new ImageIcon(buttonImage));
