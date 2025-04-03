@@ -1,20 +1,16 @@
 package com.github.zlamb1.view;
 
-import com.github.zlamb1.io.ImageLoader;
-import com.github.zlamb1.io.ImageStore;
+import com.github.zlamb1.svg.SVGButton;
+import com.github.zlamb1.svg.SVGStore;
 
 import javax.swing.*;
 import java.awt.*;
 
 public class PasswordField extends Field {
     protected char defaultEchoChar = '*';
-    protected JButton visibilityButton;
+    protected SVGButton visibilityButton;
 
-    protected boolean cachedVisibility = false;
-    protected int cachedButtonSize = -1;
-
-    private static final ImageStore visibilityOnStore = new ImageStore("visibility_on.png");
-    private static final ImageStore visibilityOffStore = new ImageStore("visibility_off.png");
+    protected static SVGStore visibilityOn = new SVGStore("visibility_on.svg"), visibilityOff = new SVGStore("visibility_off.svg");
 
     public PasswordField(String label) {
         super(label, Orientation.VERTICAL, 3, new JPasswordField());
@@ -27,8 +23,7 @@ public class PasswordField extends Field {
 
     public void setEchoChar(char c) {
         ((JPasswordField) jTextField).setEchoChar(c);
-        if (visibilityButton.isVisible())
-            repaint();
+        visibilityButton.setSVGStore(c == 0 ? visibilityOn : visibilityOff);
     }
 
     public char getDefaultEchoChar() {
@@ -57,28 +52,6 @@ public class PasswordField extends Field {
     }
 
     @Override
-    protected void paintComponent(final Graphics g) {
-        int buttonSize = jTextField.getHeight();
-        int iconSize = buttonSize - 15;
-        if ((cachedButtonSize != buttonSize || cachedVisibility != isPasswordHidden()) && iconSize > 0) {
-            cachedButtonSize = buttonSize;
-            cachedVisibility = isPasswordHidden();
-
-            ImageStore store = isPasswordHidden() ? visibilityOffStore : visibilityOnStore;
-            Image buttonImage = store.getImage(iconSize, iconSize);
-            if (buttonImage != null) {
-                visibilityButton.setVisible(true);
-                visibilityButton.setIcon(new ImageIcon(buttonImage));
-                visibilityButton.setPreferredSize(new Dimension(buttonSize, buttonSize));
-            } else {
-                visibilityButton.setVisible(false);
-            }
-        }
-
-        super.paintComponent(g);
-    }
-
-    @Override
     protected void addTextField() {
         JPanel container = new JPanel();
         container.setLayout(new GridBagLayout());
@@ -89,12 +62,15 @@ public class PasswordField extends Field {
 
         container.add(jTextField, gbc);
 
-        visibilityButton = new JButton();
+        visibilityButton = new SVGButton(visibilityOn);
+        visibilityButton.setSVGColor(visibilityButton.getForeground());
+
         visibilityButton.addActionListener((e) -> setPasswordHidden(!isPasswordHidden()));
-        visibilityButton.setVisible(false);
 
         gbc.weightx = 0;
         gbc.insets = new Insets(0, 3, 0, 0);
+        gbc.fill = GridBagConstraints.NONE;
+
         container.add(visibilityButton, gbc);
 
         container.setAlignmentX(Component.LEFT_ALIGNMENT);

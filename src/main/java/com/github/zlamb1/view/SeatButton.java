@@ -95,6 +95,7 @@ public class SeatButton extends JPanel {
         g.setColor(getRealBackground());
         g.fillRect(0, 0, getWidth() - 1, getHeight() - 1);
 
+        // FIXME: do not load font every render!
         InputStream is = SeatButton.class.getClassLoader().getResourceAsStream("Roboto.ttf");
 
         try {

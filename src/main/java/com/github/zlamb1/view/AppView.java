@@ -5,6 +5,7 @@ import com.github.zlamb1.io.ImageLoader;
 import com.github.zlamb1.layout.ILayoutService;
 import com.github.zlamb1.layout.SeatLayoutDescriptor;
 import com.github.zlamb1.svg.SVGButton;
+import com.github.zlamb1.svg.SVGSize;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -60,7 +61,7 @@ public class AppView implements IAppView {
     }
 
     @Override
-    public MenuOption renderAppView(LoginService loginService, SeatService seatService) {
+    public Collection<ISeatDescriptor> renderAppView(LoginService loginService, SeatService seatService) {
         SwingUtilities.invokeLater(() -> {
             contentPane = new JPanel();
             contentPane.setLayout(new GridBagLayout());
